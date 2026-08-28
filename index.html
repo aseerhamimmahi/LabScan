@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LabScan &mdash; Keep or Replace Decision Tool</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<!-- SheetJS for XLSX/CSV spreadsheet parsing -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="wrap">
+    <div class="brand" onclick="if(localStorage.getItem(SESSION_KEY)) showView('mode-select')" style="cursor:pointer;"><span class="dot"></span>LabScan<small>KEEP / MONITOR / REPLACE</small></div>
+    <div class="session-info" id="session-info"></div>
+  </div>
+</div>
+
+<!-- ============ AUTH VIEW ============ -->
+<div id="view-auth">
+  <div class="auth-shell">
+    <div class="auth-side">
+      <div>
+        <h1>Stop guessing on <em>lab hardware</em>.</h1>
+        <p>Log device age, benchmarks, energy costs, and repair history. LabScan runs a weighted multi-criteria scan and tells you whether to keep, monitor, or replace &mdash; no fixed schedule required.</p>
+      </div>
+      <div class="mini-scan">
+        <div class="row"><span>AGE</span><b>weight 20%</b></div>
+        <div class="row"><span>PERFORMANCE</span><b>weight 30%</b></div>
+        <div class="row"><span>REPAIR FREQUENCY</span><b>weight 10%</b></div>
+        <div class="row"><span>MAINTENANCE COST</span><b>weight 25%</b></div>
+        <div class="row"><span>ENERGY COST</span><b>weight 15%</b></div>
+      </div>
+    </div>
+    <div class="auth-form-side">
+      <div class="tab-row">
+        <button class="tab-btn active" id="tab-login" onclick="switchTab('login')">Log In</button>
+        <button class="tab-btn" id="tab-register" onclick="switchTab('register')">Register</button>
+      </div>
+
+      <!-- LOGIN FORM -->
+      <form id="form-login" onsubmit="return handleLogin(event)">
+        <div class="field">
+          <label>Lab Assistant ID</label>
+          <input type="text" id="login-id" placeholder="e.g. LA-2026-014" required autocomplete="username">
+        </div>
+        <div class="field">
+          <label>Password</label>
+          <div class="password-input-wrap">
+            <input type="password" id="login-pass" placeholder="••••••••" required autocomplete="current-password">
+            <button type="button" class="toggle-password" onclick="togglePasswordVisibility('login-pass', this)" aria-label="Toggle password visibility">
+              <svg class="eye-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <button type="submit" class="btn-primary">Log In</button>
+        <div class="form-msg" id="login-msg"></div>
+      </form>
+
+      <!-- REGISTER FORM -->
+      <form id="form-register" class="hidden" onsubmit="return handleRegister(event)">
+        <div class="field">
+          <label>Lab Assistant ID</label>
+          <input type="text" id="reg-id" placeholder="e.g. LA-2026-014" required>
+        </div>
+        <div class="field">
+          <label>Password</label>
+          <div class="password-input-wrap">
+            <input type="password" id="reg-pass" placeholder="At least 6 characters" required minlength="6">
+            <button type="button" class="toggle-password" onclick="togglePasswordVisibility('reg-pass', this)" aria-label="Toggle password visibility">
+              <svg class="eye-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="field">
+          <label>Confirm Password</label>
+          <div class="password-input-wrap">
+            <input type="password" id="reg-pass2" placeholder="Repeat password" required minlength="6">
+            <button type="button" class="toggle-password" onclick="togglePasswordVisibility('reg-pass2', this)" aria-label="Toggle password visibility">
+              <svg class="eye-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <button type="submit" class="btn-primary">Create Account</button>
+        <div class="form-msg" id="register-msg"></div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODE SELECTION VIEW ============ -->
+<div id="view-mode-select" class="hidden">
+  <div class="wrap">
+    <div class="mode-head">
+      <div class="eyebrow">EQUIPMENT ASSESSMENT</div>
+      <h2>Select Assessment Mode</h2>
+      <p>Choose how you want to evaluate your lab assets today.</p>
+    </div>
+
+    <div class="mode-grid">
+      <!-- SINGLE DEVICE CARD (LEFT) -->
+      <div class="mode-card" onclick="showView('dashboard')">
+        <div class="mode-icon">
+          <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+            <line x1="8" y1="21" x2="16" y2="21"></line>
+            <line x1="12" y1="17" x2="12" y2="21"></line>
+          </svg>
+        </div>
+        <div class="mode-tag">MANUAL SCAN</div>
+        <h3>Single Device</h3>
+        <p>Enter parameters for a single machine manually using interactive controls and sliders to generate a decision verdict.</p>
+        <button class="btn-primary mode-btn">Evaluate Single Device &rarr;</button>
+      </div>
+
+      <!-- MULTIPLE DEVICES CARD (RIGHT) -->
+      <div class="mode-card" onclick="showView('batch')">
+        <div class="mode-icon">
+          <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+            <polyline points="10 9 9 9 8 9"></polyline>
+          </svg>
+        </div>
+        <div class="mode-tag">BATCH ASSESSMENT</div>
+        <h3>Multiple Devices</h3>
+        <p>Upload a lab inventory dataset (.csv, .xlsx, .json) to evaluate an entire fleet of computers simultaneously.</p>
+        <button class="btn-primary mode-btn">Upload Lab Dataset &rarr;</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SINGLE DEVICE DASHBOARD VIEW ============ -->
+<div id="view-dashboard" class="hidden">
+  <div class="wrap">
+    <div class="dash-head">
+      <button class="btn-ghost" onclick="showView('mode-select')" style="margin-bottom:14px;">&larr; Change Mode</button>
+      <div class="eyebrow">Decision Support Scan</div>
+      <h2>Evaluate a single lab device</h2>
+      <p>Enter the device's data below. LabScan applies a weighted scoring model across five key criteria and classifies it as Keep, Monitor, or Replace.</p>
+    </div>
+
+    <div class="dash-grid">
+      <!-- INPUT PANEL -->
+      <div class="panel">
+        <h3>Device Data <span class="tag">INPUT</span></h3>
+        <form id="form-scan" onsubmit="return handleScan(event)">
+          <div class="grid-2">
+            <div class="field">
+              <label>Device ID / Tag</label>
+              <input type="text" id="in-name" placeholder="e.g. Lab-3 PC-14" required>
+            </div>
+            <div class="field">
+              <label>Purchase Year</label>
+              <input type="number" id="in-year" placeholder="e.g. 2021" min="1990" max="2026" required oninput="updateAutoAge()">
+            </div>
+          </div>
+
+          <div class="field" style="margin-bottom:16px;">
+            <label>Calculated Device Age <span style="font-size:11px; opacity:0.75; text-transform:none; font-family:var(--font-mono);">(2026 &minus; Purchase Year)</span></label>
+            <input type="text" id="in-age-display" placeholder="Auto-calculated from Purchase Year" readonly style="background:var(--accent-dim); color:var(--accent); font-weight:600; cursor:default;">
+            <input type="hidden" id="in-age" value="0">
+          </div>
+
+          <div class="range-field">
+            <label>Performance Score (0&ndash;100, higher = better) <span class="val" id="val-perf">70</span></label>
+            <input type="range" id="in-perf" min="0" max="100" value="70" oninput="syncVal('in-perf','val-perf')">
+          </div>
+
+          <div class="range-field">
+            <label>Repairs in Last 12 Months <span class="val" id="val-repairs">1</span></label>
+            <input type="range" id="in-repairs" min="0" max="10" value="1" oninput="syncVal('in-repairs','val-repairs')">
+          </div>
+
+          <div class="grid-2">
+            <div class="field">
+              <label>Annual Maintenance Cost (BDT)</label>
+              <input type="number" id="in-cost" placeholder="e.g. 3500" min="0" required>
+            </div>
+            <div class="field">
+              <label>Current Replacement Cost (BDT)</label>
+              <input type="number" id="in-replacecost" placeholder="e.g. 55000" min="1" required>
+            </div>
+          </div>
+
+          <div class="field">
+            <label>Estimated Annual Energy Cost (BDT)</label>
+            <input type="number" id="in-energycost" placeholder="e.g. 7490" min="0" required>
+          </div>
+
+          <hr class="hairline">
+          <button type="submit" class="btn-primary">Run Scan</button>
+        </form>
+      </div>
+
+      <!-- RESULT PANEL -->
+      <div class="panel">
+        <h3>Scan Result <span class="tag" id="result-tag">OUTPUT</span></h3>
+        <div id="result-empty" class="empty-state">
+          <div class="icon">&#9673;</div>
+          Run a scan to see the composite risk score and Keep / Monitor / Replace recommendation here.
+        </div>
+        <div id="result-body" class="hidden">
+          <div class="gauge-wrap">
+            <svg width="220" height="130" viewBox="0 0 220 130">
+              <path d="M20,120 A90,90 0 0,1 200,120" fill="none" stroke="#2a323d" stroke-width="14" stroke-linecap="round"/>
+              <path id="gauge-arc" d="M20,120 A90,90 0 0,1 200,120" fill="none" stroke="#35c2c1" stroke-width="14" stroke-linecap="round"
+                    stroke-dasharray="283" stroke-dashoffset="283"/>
+            </svg>
+            <div class="gauge-score" id="gauge-score">0</div>
+            <div class="gauge-label">Composite Risk Score</div>
+          </div>
+          <div class="verdict-wrap">
+            <div class="verdict" id="verdict-badge">&mdash;</div>
+          </div>
+
+          <div class="breakdown" id="breakdown"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- HISTORY -->
+    <div class="panel" style="margin-top:22px;">
+      <h3>Scan History <span class="tag">LOG</span></h3>
+      <div id="history-empty" class="empty-state" style="padding:20px 10px;">No scans yet for this account.</div>
+      <div class="history-list" id="history-list"></div>
+    </div>
+
+    <div class="footer-note">LabScan &middot; weighted multi-criteria decision model &middot; data stored locally in this browser only</div>
+  </div>
+</div>
+
+<!-- ============ MULTIPLE DEVICES BATCH VIEW ============ -->
+<div id="view-batch" class="hidden">
+  <div class="wrap">
+    <div class="dash-head">
+      <button class="btn-ghost" onclick="showView('mode-select')" style="margin-bottom:14px;">&larr; Change Mode</button>
+      <div class="eyebrow">BATCH EVALUATION</div>
+      <h2>Multiple Devices Assessment</h2>
+      <p>Upload a lab inventory file (.csv, .xlsx, or .json) to evaluate an entire laboratory dataset automatically.</p>
+    </div>
+
+    <!-- UPLOAD ZONE PANEL -->
+    <div class="panel upload-panel">
+      <div class="drop-zone" id="drop-zone" onclick="document.getElementById('batch-file-input').click()">
+        <div class="upload-icon">
+          <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="17 8 12 3 7 8"></polyline>
+            <line x1="12" y1="3" x2="12" y2="15"></line>
+          </svg>
+        </div>
+        <h4>Drag & Drop your Lab Data File here</h4>
+        <p>Supports <strong>.csv</strong>, <strong>.xlsx</strong>, <strong>.xls</strong>, and <strong>.json</strong> files</p>
+        <button type="button" class="btn-primary" style="max-width:200px; margin:16px auto 0;">Browse Files</button>
+        <input type="file" id="batch-file-input" class="hidden" accept=".csv, .xlsx, .xls, .json" onchange="handleFileUpload(event)">
+      </div>
+
+      <div class="demo-data-bar">
+        <span>Or test instantly with sample lab dataset:</span>
+        <div class="demo-buttons">
+          <button class="btn-ghost" onclick="loadSampleLabData('Lab-1')">Load Lab-1 Data</button>
+          <button class="btn-ghost" onclick="loadSampleLabData('Lab-3')">Load Lab-3 Data</button>
+          <button class="btn-ghost" onclick="loadSampleLabData('Lab-5')">Load Lab-5 Data</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- BATCH RESULTS SECTION -->
+    <div id="batch-results-container" class="hidden">
+      <!-- SUMMARY STATS GRID -->
+      <div class="batch-stats-grid">
+        <div class="stat-card">
+          <span class="stat-label">TOTAL DEVICES</span>
+          <span class="stat-val" id="stat-total">0</span>
+        </div>
+        <div class="stat-card keep">
+          <span class="stat-label">KEEP</span>
+          <span class="stat-val" id="stat-keep">0</span>
+        </div>
+        <div class="stat-card monitor">
+          <span class="stat-label">MONITOR</span>
+          <span class="stat-val" id="stat-monitor">0</span>
+        </div>
+        <div class="stat-card replace">
+          <span class="stat-label">REPLACE</span>
+          <span class="stat-val" id="stat-replace">0</span>
+        </div>
+      </div>
+
+      <!-- FILTER & TABLE PANEL -->
+      <div class="panel" style="margin-top:22px;">
+        <div class="table-controls">
+          <div class="filter-tabs">
+            <button class="filter-btn active" onclick="filterBatchTable('ALL', this)">All Devices</button>
+            <button class="filter-btn" onclick="filterBatchTable('KEEP', this)">Keep</button>
+            <button class="filter-btn" onclick="filterBatchTable('MONITOR', this)">Monitor</button>
+            <button class="filter-btn" onclick="filterBatchTable('REPLACE', this)">Replace</button>
+          </div>
+          <div class="search-wrap">
+            <input type="text" id="batch-search" placeholder="Search device ID or model..." oninput="renderBatchTable()">
+          </div>
+          <button class="btn-ghost" onclick="exportBatchCSV()">Export CSV Report</button>
+        </div>
+
+        <div class="table-responsive">
+          <table class="batch-table">
+            <thead>
+              <tr>
+                <th>Device ID</th>
+                <th>Lab Name</th>
+                <th>Model / Specs</th>
+                <th>Age</th>
+                <th>Perf Score</th>
+                <th>Repairs</th>
+                <th>Maint. Cost</th>
+                <th>Energy Cost</th>
+                <th>Risk Score</th>
+                <th>Verdict</th>
+              </tr>
+            </thead>
+            <tbody id="batch-table-body">
+              <!-- Dynamically rendered batch rows -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer-note">LabScan &middot; weighted multi-criteria batch decision model &middot; client-side processing</div>
+  </div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html></body>
+</html>
